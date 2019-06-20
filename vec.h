@@ -22,14 +22,16 @@ class vec {
     union Data {
         T small;
         Big *big;
+
         Data() : big(nullptr) {};
+
         ~Data() {};
     } _data;
 
     size_t isSmall;
 
     Big *allocBig(size_t capacity = 1) {
-        Big *res = static_cast<Big*>(operator new(sizeof(Big) + sizeof(T) * capacity));
+        Big *res = static_cast<Big *>(operator new(sizeof(Big) + sizeof(T) * capacity));
         res->links = 1;
         res->size = 0;
         res->capacity = capacity;
@@ -59,18 +61,20 @@ class vec {
         isSmall = 2;
     }
 
-    void unfollow(Big* arg){
-        if(0 == --(arg->links)){
-            for(size_t i = 0; i < arg->size; ++i)
+    void unfollow(Big *arg) {
+        if (0 == --(arg->links)) {
+            for (size_t i = 0; i < arg->size; ++i)
                 arg->data[i].~T();
-            operator delete(static_cast<void*>(arg));
+            operator delete(static_cast<void *>(arg));
         }
         arg = nullptr;
     }
 
-    void cntr(){
-        if(isSmall == 2){
-
+    void cntr() {
+        if (isSmall == 2 && _data.big->links > 1) {
+            Big *c = cloneBig(_data.big);
+            unfollow(_data.big);
+            _data.big = c;
         }
     }
 
@@ -79,12 +83,11 @@ public:
 
     typedef T value_type;
 
-    typedef T* iterator;
-    typedef const T* const_iterator;
+    typedef T *iterator;
+    typedef const T *const_iterator;
     typedef std::reverse_iterator<iterator> reverse_iterator;
     typedef std::reverse_iterator<const_iterator> reverse_const_iterator;
     typedef reverse_const_iterator const_reverse_iterator;
-
 
 
     vec() noexcept;
@@ -117,18 +120,22 @@ public:
 
     void pop_back() { resize(size() - 1); };
 
-    T* data() const noexcept;
+    T *data() const noexcept;
 
     iterator begin() { return data() + 0; };
+
     const_iterator begin() const { return data() + 0; };
 
     iterator end() { return data() + size(); };
+
     const_iterator end() const { return data() + size(); };
 
     reverse_iterator rbegin() { return std::reverse_iterator(end()); };
+
     reverse_const_iterator rbegin() const { return std::reverse_iterator(end()); };
 
     reverse_iterator rend() { return std::reverse_iterator(begin()); };
+
     reverse_const_iterator rend() const { return std::reverse_iterator(begin()); };
 
     bool empty() const noexcept { return size() == 0; };
@@ -137,7 +144,7 @@ public:
 
     void reserve(size_t);
 
-    size_t capacity() noexcept;
+    size_t capacity() const noexcept;
 
     void shrink_to_fit();
 
@@ -150,16 +157,16 @@ public:
     // iterator erase(const_iterator pos) {return nullptr;}; //TODO: init
     // iterator erase(const_iterator first, const_iterator last) {return nullptr;}; //TODO: init
 
-    iterator insert(const_iterator pos, T const& val){
+    iterator insert(const_iterator pos, T const &val) {
         vec<T> cop;
         iterator r = begin();
-        while(r != pos){
+        while (r != pos) {
             cop.push_back(*r);
             ++r;
         }
         size_t offset = cop.size();
         cop.push_back(val);
-        while(r != end()){
+        while (r != end()) {
             cop.push_back(*r);
             ++r;
         }
@@ -173,38 +180,39 @@ public:
     iterator erase(const_iterator first, const_iterator last) {
         vec<T> cop;
         iterator t = begin();
-        while(t != first) cop.push_back(*(t++));
-        while(t != last) t++;
+        while (t != first) cop.push_back(*(t++));
+        while (t != last) t++;
         size_t result_offset = cop.size();
-        while(t != end()) cop.push_back(*(t++));
+        while (t != end()) cop.push_back(*(t++));
         swap(*this, cop);
         return begin() + result_offset;
     }
+
     template<class E>
     friend void swap(vec<E> &, vec<E> &);
 
 };
 
 template<class T>
-int cmp(const vec<T> &, const vec<T> &);
+int cmp(const vec<T> &, const vec<T> &) noexcept;
 
 template<class T>
-bool operator==(const vec<T> &, const vec<T> &);
+bool operator==(const vec<T> &, const vec<T> &) noexcept;
 
 template<class T>
-bool operator!=(const vec<T> &, const vec<T> &);
+bool operator!=(const vec<T> &, const vec<T> &) noexcept;
 
 template<class T>
-bool operator<(const vec<T> &, const vec<T> &);
+bool operator<(const vec<T> &, const vec<T> &) noexcept;
 
 template<class T>
-bool operator>(const vec<T> &, const vec<T> &);
+bool operator>(const vec<T> &, const vec<T> &) noexcept;
 
 template<class T>
-bool operator<=(const vec<T> &, const vec<T> &);
+bool operator<=(const vec<T> &, const vec<T> &) noexcept;
 
 template<class T>
-bool operator>=(const vec<T> &, const vec<T> &);
+bool operator>=(const vec<T> &, const vec<T> &) noexcept;
 
 
 template<class T>
@@ -223,7 +231,9 @@ inline vec<T>::vec(const vec &arg) : isSmall(arg.isSmall) {
     }
     if (isSmall == 2) {
         //TODO: COW
-        _data.big = cloneBig(arg._data.big);
+        // _data.big = cloneBig(arg._data.big);
+        _data.big = arg._data.big;
+        ++_data.big->links;
     }
 }
 
@@ -232,7 +242,6 @@ template<class T>
 inline vec<T> &vec<T>::operator=(const vec &arg) {
     if (this == &arg)
         return *this;
-    //TODO: COW
     vec<T> arg_copy(arg);
     swap(arg_copy, *this);
     return *this;
@@ -243,14 +252,15 @@ inline vec<T>::~vec() noexcept {
     if (isSmall == 2) {
         unfollow(_data.big);
     }
-    if(isSmall == 1){
+    if (isSmall == 1) {
         _data.small.~T();
     }
 }
 
 template<class T>
 inline T &vec<T>::operator[](size_t index) {
-    return const_cast<T&>(const_cast<const vec<T>*>(this)->operator[](index));
+    cntr();
+    return const_cast<T &>(const_cast<const vec<T> *>(this)->operator[](index));
 }
 
 template<class T>
@@ -261,6 +271,7 @@ inline const T &vec<T>::operator[](size_t index) const {
 
 template<class T>
 inline void vec<T>::push_back(const T &arg) {
+    cntr();
 
     if (isSmall == 0) {
         isSmall = 1;
@@ -273,22 +284,22 @@ inline void vec<T>::push_back(const T &arg) {
         return;
     }
     vec<T> c;
-    if(isSmall == 1) {
+    if (isSmall == 1) {
         c._data.big = allocBig(2);
         new(c._data.big->data) T(_data.small);
-        c._data.big->size = 1; }
-    else c._data.big = cloneBig(_data.big, std::max(_data.big->capacity, _data.big->size + 1));
+        c._data.big->size = 1;
+    } else c._data.big = cloneBig(_data.big, std::max(_data.big->capacity, _data.big->size + 1));
     c.isSmall = 2;
-    new (c._data.big->data + size()) T(arg);
+    new(c._data.big->data + size()) T(arg);
     c._data.big->size++;
     swap(c, *this);
 }
 
 
 template<class T>
-inline T* vec<T>::data() const noexcept {
-    if(isSmall == 2) return _data.big->data;
-    return const_cast<T*>(&_data.small);
+inline T *vec<T>::data() const noexcept {
+    if (isSmall == 2) return _data.big->data;
+    return const_cast<T *>(&_data.small);
 }
 
 
@@ -300,17 +311,18 @@ inline size_t vec<T>::size() const noexcept {
 
 template<class T>
 inline void vec<T>::reserve(size_t len) {
+    cntr();
     vec<T> c;
     c._data.big = allocBig(len);
     c.isSmall = 2;
     c._data.big->size = size();
     for (size_t i = 0; i != size(); ++i)
-        new (c._data.big->data + i) T(operator[](i));
+        new(c._data.big->data + i) T(operator[](i));
     swap(c, *this);
 }
 
 template<class T>
-inline size_t vec<T>::capacity() noexcept {
+inline size_t vec<T>::capacity() const noexcept {
     if (isSmall == 0)return 0;
     if (isSmall == 1)return 1;
     return _data.big->capacity;
@@ -318,6 +330,7 @@ inline size_t vec<T>::capacity() noexcept {
 
 template<class T>
 inline void vec<T>::shrink_to_fit() {
+    cntr();
     vec<T> c;
     c.reserve(size());
     for (size_t i = 0; i < size(); ++i)
@@ -327,6 +340,7 @@ inline void vec<T>::shrink_to_fit() {
 
 template<class T>
 inline void vec<T>::resize(size_t len) {
+    cntr();
     if (isSmall == 0) {
         isSmall = 2;
         _data.big = allocBig(len);
@@ -335,8 +349,8 @@ inline void vec<T>::resize(size_t len) {
     if (isSmall == 1) {
         make_big();
     }
-    if(size() >= len){
-        for(size_t i = len; i < size(); ++i)
+    if (size() >= len) {
+        for (size_t i = len; i < size(); ++i)
             data()[i].~T();
         _data.big->size = len;
         return;
@@ -344,13 +358,14 @@ inline void vec<T>::resize(size_t len) {
     vec<T> c;
     c.reserve(len > size() ? len : size());
     for (size_t i = 0; i != len && i != size(); ++i)
-        new (c.data() + i) T(operator[](i));
+        new(c.data() + i) T(operator[](i));
     c._data.big->size = len;
     swap(c, *this);
 }
 
 template<class T>
 inline void vec<T>::clear() noexcept {
+    cntr();
     if (isSmall == 0)return;
     if (isSmall == 1) {
         isSmall = 0;
@@ -368,23 +383,46 @@ inline void swap(vec<T> &lhs, vec<T> &rhs) {
     //std::swap(lhs._data, rhs._data);
     // std::swap(lhs._data.big, rhs._data.big);
     // std::swap(lhs._data.small, rhs._data.small);
-    if(lhs.isSmall == 2 && rhs.isSmall == 2) std::swap(lhs._data.big, rhs._data.big);
-    if(lhs.isSmall != 2 && rhs.isSmall != 2) std::swap(lhs._data.small, rhs._data.small);
-    if((lhs.isSmall == 2) ^ (rhs.isSmall == 2)){
-        vec<T> & c = ((lhs.isSmall == 2) ? lhs : rhs);
-        vec<T> & d = ((rhs.isSmall != 2) ? rhs : lhs);
-        void* r = operator new(std::max(sizeof(T), sizeof(void*)));
-        memcpy(r, &c._data.big, std::max(sizeof(T), sizeof(void*)));
-        new (&c._data.small) T(d._data.small);
+    std::swap(lhs.isSmall, rhs.isSmall);
+    if (lhs.isSmall == 0 && rhs.isSmall == 0) return;
+    if (lhs.isSmall == 1 && rhs.isSmall == 1) {
+        std::swap(lhs._data.small, rhs._data.small);
+        return;
+    }
+    if (lhs.isSmall == 2 && rhs.isSmall == 2) {
+        std::swap(lhs._data.big, rhs._data.big);
+        return;
+    }
+    if (((lhs.isSmall == 0) && (rhs.isSmall == 1)) || ((lhs.isSmall == 1) && (rhs.isSmall == 0))) {
+        vec<T> &c = ((lhs.isSmall == 1) ? lhs : rhs);
+        vec<T> &d = ((rhs.isSmall != 1) ? rhs : lhs);
+        new(&c._data.small) T(d._data.small);
         d._data.small.~T();
-        memcpy(&d._data.big, r, std::max(sizeof(T), sizeof(void*)));
+    }
+    if (((lhs.isSmall == 2) && (rhs.isSmall == 0)) || ((lhs.isSmall == 0) && (rhs.isSmall == 2))) {
+        vec<T> &c = ((lhs.isSmall != 2) ? lhs : rhs);
+        vec<T> &d = ((rhs.isSmall == 2) ? rhs : lhs);
+        void *r = operator new(std::max(sizeof(T), sizeof(void *)));
+        memcpy(r, &c._data.big, std::max(sizeof(T), sizeof(void *)));
+        memcpy(&d._data.big, r, std::max(sizeof(T), sizeof(void *)));
         operator delete(r);
     }
-    std::swap(lhs.isSmall, rhs.isSmall);
+    if (((lhs.isSmall == 2) && (rhs.isSmall == 1)) || ((lhs.isSmall == 1) && (rhs.isSmall == 2))) {
+        vec<T> &c = ((lhs.isSmall != 2) ? lhs : rhs);
+        vec<T> &d = ((rhs.isSmall == 2) ? rhs : lhs);
+        void *r = operator new(std::max(sizeof(T), sizeof(void *)));
+        memcpy(r, &c._data.big, std::max(sizeof(T), sizeof(void *)));
+        if (d.isSmall) {
+            new(&c._data.small) T(d._data.small);
+            d._data.small.~T();
+        }
+        memcpy(&d._data.big, r, std::max(sizeof(T), sizeof(void *)));
+        operator delete(r);
+    }
 }
 
 template<class T>
-inline int cmp(const vec<T> &lhs, const vec<T> &rhs) {
+inline int cmp(const vec<T> &lhs, const vec<T> &rhs) noexcept {
     for (size_t i = 0; i < lhs.size(); ++i)
         if (lhs[i] != rhs[i]) {
             return lhs[i] < rhs[i] ? -1 : 1;
@@ -395,22 +433,22 @@ inline int cmp(const vec<T> &lhs, const vec<T> &rhs) {
 }
 
 template<class T>
-bool operator==(const vec<T> &lhs, const vec<T> &rhs) { return cmp(lhs, rhs) == 0; }
+bool operator==(const vec<T> &lhs, const vec<T> &rhs) noexcept { return cmp(lhs, rhs) == 0; }
 
 template<class T>
-bool operator!=(const vec<T> &lhs, const vec<T> &rhs) { return cmp(lhs, rhs) != 0; }
+bool operator!=(const vec<T> &lhs, const vec<T> &rhs) noexcept { return cmp(lhs, rhs) != 0; }
 
 template<class T>
-bool operator<(const vec<T> &lhs, const vec<T> &rhs) { return cmp(lhs, rhs) < 0; }
+bool operator<(const vec<T> &lhs, const vec<T> &rhs) noexcept { return cmp(lhs, rhs) < 0; }
 
 template<class T>
-bool operator>(const vec<T> &lhs, const vec<T> &rhs) { return cmp(lhs, rhs) > 0; }
+bool operator>(const vec<T> &lhs, const vec<T> &rhs) noexcept { return cmp(lhs, rhs) > 0; }
 
 template<class T>
-bool operator<=(const vec<T> &lhs, const vec<T> &rhs) { return cmp(lhs, rhs) <= 0; }
+bool operator<=(const vec<T> &lhs, const vec<T> &rhs) noexcept { return cmp(lhs, rhs) <= 0; }
 
 template<class T>
-bool operator>=(const vec<T> &lhs, const vec<T> &rhs) { return cmp(lhs, rhs) >= 0; }
+bool operator>=(const vec<T> &lhs, const vec<T> &rhs) noexcept { return cmp(lhs, rhs) >= 0; }
 
 template<class T>
 template<class InputIterator>
@@ -428,6 +466,7 @@ inline vec<T>::vec(InputIterator l, InputIterator r) {
 template<class T>
 template<class InputIterator>
 inline void vec<T>::assign(InputIterator l, InputIterator r) {
+    cntr();
     isSmall = 0;
     vec<T> cop;
     while (l != r) {
