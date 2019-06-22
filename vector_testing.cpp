@@ -1030,3 +1030,95 @@ TEST(exceptions, reserve)
         });
     });
 }
+
+TEST(exceptions, reserve_and_insert)
+{
+faulty_run([]
+{
+counted::no_new_instances_guard g;
+container_int c;
+c.reserve(10);
+
+EXPECT_NO_THROW(
+{
+for (size_t i = 0; i != 10; ++i)
+c.insert(c.begin(), i);
+});
+});
+}
+
+TEST(exceptions, construct_iterator) {
+faulty_run([]
+{
+counted::no_new_instances_guard g;
+container_int c;
+c.reserve(10);
+
+EXPECT_NO_THROW(
+{
+for (size_t i = 0; i != 10; ++i) {
+c.push_back(42);
+}
+});
+container_int d(c.begin(), c.end());
+for (size_t i = 0; i != 10; i++) {
+EXPECT_EQ(42, d[i]);
+}
+});
+}
+
+TEST(correctness, assigns) {
+    faulty_run([]
+    {
+        counted::no_new_instances_guard g;
+        container c;
+        c.push_back(1);
+        c.push_back(2);
+        c.push_back(3);
+        container d;
+        d.push_back(4);
+        EXPECT_EQ(4, d[0]);
+        d.assign(c.begin(), c.end());
+        EXPECT_EQ(3u, d.size());
+        EXPECT_EQ(1, d[0]);
+        EXPECT_EQ(2, d[1]);
+        EXPECT_EQ(3, d[2]);
+        container e;
+        e.push_back(5);
+        c.assign(e.begin(), e.end());
+        EXPECT_EQ(1u, c.size());
+        EXPECT_EQ(5, c[0]);
+    });
+}
+
+TEST(correctness, clear) {
+faulty_run([]
+{
+counted::no_new_instances_guard g;
+container c;
+for (size_t i = 0; i != 10; i++) {
+c.push_back(228);
+}
+EXPECT_EQ(10u, c.size());
+c.clear();
+EXPECT_EQ(0u, c.size());
+});
+}
+
+TEST(correctness, resize) {
+faulty_run([]
+{
+counted::no_new_instances_guard g;
+container c;
+for (size_t i = 0; i != 5; i++) {
+c.push_back(282);
+}
+c.resize(4, 228);
+EXPECT_EQ(4u, c.size());
+c.resize(10, 228);
+EXPECT_EQ(10u, c.size());
+EXPECT_EQ(282, c[3]);
+EXPECT_EQ(228, c[4]);
+EXPECT_EQ(228, c[9]);
+});
+}
