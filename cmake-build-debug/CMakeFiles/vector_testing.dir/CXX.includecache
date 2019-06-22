@@ -1,0 +1,26 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/maslov/CLionProjects/Pro/fault_injection.cpp
+fault_injection.h
+/home/maslov/CLionProjects/Pro/fault_injection.h
+cassert
+-
+iostream
+-
+vector
+-
+sys/mman.h
+-
+
+/home/maslov/CLionProjects/Pro/fault_injection.h
+functional
+-
+stdexcept
+-
+

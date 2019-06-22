@@ -1,0 +1,4 @@
+/home/maslov/CLionProjects/Pro/CMakeFiles/rebuild_cache.dir
+/home/maslov/CLionProjects/Pro/CMakeFiles/edit_cache.dir
+/home/maslov/CLionProjects/Pro/CMakeFiles/Pro.dir
+/home/maslov/CLionProjects/Pro/CMakeFiles/vector_testing.dir

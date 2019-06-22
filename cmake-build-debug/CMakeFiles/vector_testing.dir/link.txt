@@ -1,0 +1,1 @@
+/usr/bin/c++   -Wall -std=c++11 -pedantic -g -fsanitize=address,undefined -D_GLIBCXX_DEBUG   CMakeFiles/vector_testing.dir/vector_testing.cpp.o CMakeFiles/vector_testing.dir/counted.cpp.o CMakeFiles/vector_testing.dir/fault_injection.cpp.o CMakeFiles/vector_testing.dir/gtest/gtest-all.cc.o CMakeFiles/vector_testing.dir/gtest/gtest_main.cc.o  -o vector_testing -lpthread 

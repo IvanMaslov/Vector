@@ -31,7 +31,14 @@ class vec {
     size_t isSmall;
 
     Big *allocBig(size_t capacity = 1) {
-        Big *res = static_cast<Big *>(operator new(sizeof(Big) + sizeof(T) * capacity));
+        Big *res = nullptr;
+        try{
+            res = reinterpret_cast<Big *>(operator new(sizeof(Big) + sizeof(T) * capacity));
+        } catch (...) {
+            operator delete(res);
+            res = nullptr;
+            throw;
+        }
         res->links = 1;
         res->size = 0;
         res->capacity = capacity;
@@ -43,7 +50,15 @@ class vec {
         Big *cop = allocBig(std::max(arg->capacity, prefered_size));
         cop->size = arg->size;
         for (size_t i = 0; i < arg->size; ++i)
-            new(cop->data + i) T(arg->data[i]);
+            try{
+                new(cop->data + i) T(arg->data[i]);
+            } catch (...) {
+                for(size_t j = 0; j != i; ++j)
+                    (cop->data + j)->~T();
+                operator delete(cop);
+                throw;
+            }
+
         return cop;
     }
 
@@ -61,11 +76,12 @@ class vec {
         isSmall = 2;
     }
 
-    void unfollow(Big *arg) {
+    void unfollow(Big *&arg) {
+        if(!arg) return;
         if (0 == --(arg->links)) {
             for (size_t i = 0; i < arg->size; ++i)
                 arg->data[i].~T();
-            operator delete(static_cast<void *>(arg));
+            operator delete(reinterpret_cast<void *>(arg));
         }
         arg = nullptr;
     }
@@ -106,15 +122,15 @@ public:
 
     T &operator[](size_t);
 
-    const T &operator[](size_t) const;
+    const T &operator[](size_t) const noexcept;
 
     T &front() { return operator[](0); };
 
-    const T &front() const { return operator[](0); };
+    const T &front() const noexcept { return operator[](0); };
 
     T &back() { return operator[](size() - 1); };
 
-    const T &back() const { return operator[](size() - 1); };
+    const T &back() const noexcept { return operator[](size() - 1); };
 
     void push_back(const T &);
 
@@ -122,21 +138,21 @@ public:
 
     T *data() const noexcept;
 
-    iterator begin() { return data() + 0; };
+    iterator begin() noexcept { return data() + 0; };
 
-    const_iterator begin() const { return data() + 0; };
+    const_iterator begin() const noexcept { return data() + 0; };
 
-    iterator end() { return data() + size(); };
+    iterator end() noexcept { return data() + size(); };
 
-    const_iterator end() const { return data() + size(); };
+    const_iterator end() const noexcept { return data() + size(); };
 
-    reverse_iterator rbegin() { return std::reverse_iterator(end()); };
+    reverse_iterator rbegin() noexcept { return std::reverse_iterator(end()); };
 
-    reverse_const_iterator rbegin() const { return std::reverse_iterator(end()); };
+    reverse_const_iterator rbegin() const noexcept { return std::reverse_iterator(end()); };
 
-    reverse_iterator rend() { return std::reverse_iterator(begin()); };
+    reverse_iterator rend() noexcept { return std::reverse_iterator(begin()); };
 
-    reverse_const_iterator rend() const { return std::reverse_iterator(begin()); };
+    reverse_const_iterator rend() const noexcept { return std::reverse_iterator(begin()); };
 
     bool empty() const noexcept { return size() == 0; };
 
@@ -257,6 +273,7 @@ inline vec<T>::~vec() noexcept {
     }
 }
 
+
 template<class T>
 inline T &vec<T>::operator[](size_t index) {
     cntr();
@@ -264,7 +281,7 @@ inline T &vec<T>::operator[](size_t index) {
 }
 
 template<class T>
-inline const T &vec<T>::operator[](size_t index) const {
+inline const T &vec<T>::operator[](size_t index) const noexcept {
     if (isSmall == 1)return _data.small;
     return _data.big->data[index];
 }
@@ -283,13 +300,22 @@ inline void vec<T>::push_back(const T &arg) {
         }
         return;
     }
+    if(isSmall == 2 && _data.big->capacity != _data.big->size){
+        try{
+            new(_data.big->data + size()) T(arg);
+            _data.big->size++;
+            return;
+        } catch (...) {
+            throw;
+        }
+    }
     vec<T> c;
+    c.isSmall = 2;
     if (isSmall == 1) {
         c._data.big = allocBig(2);
         new(c._data.big->data) T(_data.small);
         c._data.big->size = 1;
     } else c._data.big = cloneBig(_data.big, std::max(_data.big->capacity, _data.big->size + 1));
-    c.isSmall = 2;
     new(c._data.big->data + size()) T(arg);
     c._data.big->size++;
     swap(c, *this);
@@ -313,11 +339,16 @@ template<class T>
 inline void vec<T>::reserve(size_t len) {
     cntr();
     vec<T> c;
-    c._data.big = allocBig(len);
     c.isSmall = 2;
+    c._data.big = allocBig(len);
     c._data.big->size = size();
     for (size_t i = 0; i != size(); ++i)
-        new(c._data.big->data + i) T(operator[](i));
+        try{
+            new(c._data.big->data + i) T(operator[](i));
+        } catch (...) {
+            c._data.big->size = i;
+            throw;
+        }
     swap(c, *this);
 }
 
@@ -365,15 +396,14 @@ inline void vec<T>::resize(size_t len) {
 
 template<class T>
 inline void vec<T>::clear() noexcept {
-    cntr();
     if (isSmall == 0)return;
     if (isSmall == 1) {
         isSmall = 0;
         return;
     }
     if (isSmall == 2) {
-        isSmall = 2;
-        _data.big->size = 0;
+        //_data.big->size = 0;
+        unfollow(_data.big);
         return;
     }
 }
@@ -396,13 +426,25 @@ inline void swap(vec<T> &lhs, vec<T> &rhs) {
     if (((lhs.isSmall == 0) && (rhs.isSmall == 1)) || ((lhs.isSmall == 1) && (rhs.isSmall == 0))) {
         vec<T> &c = ((lhs.isSmall == 1) ? lhs : rhs);
         vec<T> &d = ((rhs.isSmall != 1) ? rhs : lhs);
-        new(&c._data.small) T(d._data.small);
+        try {
+            new(&c._data.small) T(d._data.small);
+        } catch (...) {
+            std::swap(lhs.isSmall, rhs.isSmall);
+            throw;
+        }
         d._data.small.~T();
     }
     if (((lhs.isSmall == 2) && (rhs.isSmall == 0)) || ((lhs.isSmall == 0) && (rhs.isSmall == 2))) {
         vec<T> &c = ((lhs.isSmall != 2) ? lhs : rhs);
         vec<T> &d = ((rhs.isSmall == 2) ? rhs : lhs);
-        void *r = operator new(std::max(sizeof(T), sizeof(void *)));
+        void *r = nullptr;
+        try {
+            r = operator new(std::max(sizeof(T), sizeof(void *)));
+        } catch (...) {
+            std::swap(lhs.isSmall, rhs.isSmall);
+            operator delete(r);
+            throw;
+        }
         memcpy(r, &c._data.big, std::max(sizeof(T), sizeof(void *)));
         memcpy(&d._data.big, r, std::max(sizeof(T), sizeof(void *)));
         operator delete(r);
@@ -410,10 +452,22 @@ inline void swap(vec<T> &lhs, vec<T> &rhs) {
     if (((lhs.isSmall == 2) && (rhs.isSmall == 1)) || ((lhs.isSmall == 1) && (rhs.isSmall == 2))) {
         vec<T> &c = ((lhs.isSmall != 2) ? lhs : rhs);
         vec<T> &d = ((rhs.isSmall == 2) ? rhs : lhs);
-        void *r = operator new(std::max(sizeof(T), sizeof(void *)));
+        void *r = nullptr;
+        try {
+            r = operator new(std::max(sizeof(T), sizeof(void *)));
+        } catch (...) {
+            std::swap(lhs.isSmall, rhs.isSmall);
+            throw;
+        }
         memcpy(r, &c._data.big, std::max(sizeof(T), sizeof(void *)));
         if (d.isSmall) {
-            new(&c._data.small) T(d._data.small);
+            try {
+                new(&c._data.small) T(d._data.small);
+            } catch (...) {
+                std::swap(lhs.isSmall, rhs.isSmall);
+                operator delete(r);
+                throw;
+            }
             d._data.small.~T();
         }
         memcpy(&d._data.big, r, std::max(sizeof(T), sizeof(void *)));
