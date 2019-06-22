@@ -16,7 +16,7 @@ class vec {
         size_t links;
         size_t size;
         size_t capacity;
-        T data[];
+        T data[0];
     };
 
     union Data {
@@ -165,6 +165,7 @@ public:
     void shrink_to_fit();
 
     void resize(size_t);
+    void resize(size_t, const T &);
 
     void clear() noexcept;
 
@@ -174,6 +175,16 @@ public:
     // iterator erase(const_iterator first, const_iterator last) {return nullptr;}; //TODO: init
 
     iterator insert(const_iterator pos, T const &val) {
+        if(size() + 1 <= capacity()){
+            push_back(val);
+            size_t i = size() - 1;
+            do{
+                if(i == 0)return begin();
+                std::swap(operator[](i - 1), operator[](i));
+                --i;
+            }while(pos != begin() + i);
+            return begin() + i;
+        }
         vec<T> cop;
         iterator r = begin();
         while (r != pos) {
@@ -369,6 +380,36 @@ inline void vec<T>::shrink_to_fit() {
     swap(c, *this);
 }
 
+template<typename T>
+inline void vec<T>::resize(size_t len, const T &val) {
+    cntr();
+    if (isSmall == 0) {
+        isSmall = 2;
+        _data.big = allocBig(len);
+        return;
+    }
+    if (isSmall == 1) {
+        make_big();
+    }
+    if (size() >= len) {
+        for (size_t i = len; i < size(); ++i)
+            data()[i].~T();
+        _data.big->size = len;
+        return;
+    }
+    vec<T> c;
+    c.reserve(len > size() ? len : size());
+    for (size_t i = 0; i < len; ++i)
+        if(i < size()){
+            new(c.data() + i) T(operator[](i));
+            c._data.big->size++;
+        } else {
+            new(c.data() + i) T(val);
+            c._data.big->size++;
+        }
+    c._data.big->size = len;
+    swap(c, *this);
+}
 template<class T>
 inline void vec<T>::resize(size_t len) {
     cntr();
@@ -404,6 +445,7 @@ inline void vec<T>::clear() noexcept {
     if (isSmall == 2) {
         //_data.big->size = 0;
         unfollow(_data.big);
+        isSmall = 0;
         return;
     }
 }
@@ -521,7 +563,6 @@ template<class T>
 template<class InputIterator>
 inline void vec<T>::assign(InputIterator l, InputIterator r) {
     cntr();
-    isSmall = 0;
     vec<T> cop;
     while (l != r) {
         cop.push_back(*l);
